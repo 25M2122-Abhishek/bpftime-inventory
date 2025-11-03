@@ -8,22 +8,11 @@
 #include <unistd.h>
 #include <signal.h>
 
-struct event {
-    __u32 pkt_sz;
-};
-
 static volatile bool exiting = false;
 
 // Signal handler sets flag instead of calling exit
 static void handle_sigint(int sig) {
     exiting = true;
-}
-
-// Callback for ring buffer events
-static int handle_event(void *ctx, void *data, size_t len) {
-    struct event *e = data;
-    printf("Packet size: %u bytes\n", e->pkt_sz);
-    return 0;
 }
 
 // Libbpf print function
@@ -84,35 +73,12 @@ int main(int argc, char **argv) {
     }
 
     printf("XDP program attached to interface %s\n", iface_name);
-
-    // Find ring buffer map
-    struct bpf_map *ringbuf_map = bpf_object__find_map_by_name(obj, "ringbuf");
-    if (!ringbuf_map) {
-        fprintf(stderr, "Failed to find ring buffer map\n");
-        return 1;
-    }
-
-    // Create ring buffer
-    struct ring_buffer *rb = ring_buffer__new(bpf_map__fd(ringbuf_map), handle_event, NULL, NULL);
-    if (!rb) {
-        fprintf(stderr, "Failed to create ring buffer\n");
-        return 1;
-    }
-
-    printf("Listening for packet sizes... Ctrl+C to exit.\n");
-
-    // Poll ring buffer until exit signal
+    
     while (!exiting) {
-        int err = ring_buffer__poll(rb, 100 /* ms */);
-        if (err < 0) {
-            break;
-        }
-    }
-
-    printf("\nDetaching XDP program and cleaning up...\n");
+		sleep(1);
+	}
 
     // Clean up
-    ring_buffer__free(rb);
     bpf_link__destroy(link);
     bpf_object__close(obj);
 
