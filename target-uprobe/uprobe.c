@@ -33,7 +33,7 @@ int main(int argc, char **argv)
 	int err = 0;
 	const char *target_path = "./victim";
 	const char *target_symbol = "target_func";
-	pid_t pid = -1;
+	const unsigned long probe_addr = 0x1180; 
 
 	/* Set up libbpf errors and debug info callback */
 	libbpf_set_print(libbpf_print_fn);
@@ -41,12 +41,6 @@ int main(int argc, char **argv)
 	/* Cleaner handling of Ctrl-C */
 	signal(SIGINT, sig_handler);
 	signal(SIGTERM, sig_handler);
-
-
-	if(argc == 2){
-		pid = atoi(argv[1]);
-		printf("Attached pid : %d\n", pid);
-	}
 
 	/* Open BPF application (skeleton) */
 	skel = uprobe_bpf__open();
@@ -63,18 +57,18 @@ int main(int argc, char **argv)
 	}
 
 	/* Explicit attach */
-	LIBBPF_OPTS(bpf_uprobe_opts, attach_opts, .func_name = target_symbol,
+	LIBBPF_OPTS(bpf_uprobe_opts, attach_opts, .func_name = NULL,
 		    .retprobe = false);
 
 	struct bpf_link *link = bpf_program__attach_uprobe_opts(
-		skel->progs.do_uprobe_trace, pid, target_path, 0, &attach_opts);
+		skel->progs.do_uprobe_trace, -1, target_path, probe_addr, &attach_opts);
 	if (!link) {
 		fprintf(stderr, "Failed to attach uprobe to %s:%s\n", target_path, target_symbol);
 		err = -1;
 		goto cleanup;
 	}
 
-	printf("Attached uprobe to %s:%s\n", target_path, target_symbol);
+	printf("Attached uprobe\n");
 
 	while (!exiting) {
 		sleep(1);

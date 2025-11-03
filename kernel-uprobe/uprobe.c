@@ -33,20 +33,18 @@ int main(int argc, char **argv)
 	int err = 0;
 	const char *target_path = "./victim";
 	const char *target_symbol = "target_func";
-	pid_t pid = -1;
 
-	/* Set up libbpf errors and debug info callback */
+	/* 
+		Set up libbpf errors and debug info callback. 
+		So libbpf messages are routed to your libbpf_print_fn and printed to stderr. 
+		You will see those libbpf: lines when you execute the uprobe.c i.e userspace loader.
+	*/
+
 	libbpf_set_print(libbpf_print_fn);
 
 	/* Cleaner handling of Ctrl-C */
 	signal(SIGINT, sig_handler);
 	signal(SIGTERM, sig_handler);
-
-
-	if(argc == 2){
-		pid = atoi(argv[1]);
-		printf("Attached pid : %d\n", pid);
-	}
 
 	/* Open BPF application (skeleton) */
 	skel = uprobe_bpf__open();
@@ -62,12 +60,27 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	/* Explicit attach */
+	/* 
+		LIBBPF_OPTS macro used to declare and initialize an options struct in a compact, safe way
+		bpf_uprobe_opts - struct type that holds optional parameters for attaching uprobes.
+		attach_opts - instance name struct bpf_uprobe_opts
+		.func_name - target_symbol sets the name of the symbol to attach to (a string).
+		.retprobe = false sets whether this is a return probe (uretprobe) or not. false => normal entry uprobe
+	*/
 	LIBBPF_OPTS(bpf_uprobe_opts, attach_opts, .func_name = target_symbol,
 		    .retprobe = false);
-
+	
+	/* 
+		Explicit attach 
+		skel->progs.do_uprobe_trace - The specific compiled eBPF program you want run when the probe fires (from your skeleton)
+		pid == -1 -> "attach to the binary image at path target_path" i.e
+					  this is a global probe attached to that executable file 
+					  (any process that executes that binary will hit the probe).
+		pid >= 0 -> you can attach to a specific running process’s instance (a probe attached to a given PID's mapping). 
+					Use pid when you want to probe a particular process instance instead of the binary as a whole.
+	*/
 	struct bpf_link *link = bpf_program__attach_uprobe_opts(
-		skel->progs.do_uprobe_trace, pid, target_path, 0, &attach_opts);
+		skel->progs.do_uprobe_trace, -1, target_path, 0, &attach_opts);
 	if (!link) {
 		fprintf(stderr, "Failed to attach uprobe to %s:%s\n", target_path, target_symbol);
 		err = -1;
